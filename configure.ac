@@ -335,14 +335,30 @@ then
 fi
 
 dnl
+dnl Check Linux Distro and save it
+AC_MSG_CHECKING([for Linux distribution])
+linux_distro=`(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"') 2>/dev/null`
+AC_MSG_RESULT([$linux_distro])
+
+dnl
 dnl Check for ICU
 dnl
-ICU_MODULE_CFLAGS="`icu-config --cppflags 2> /dev/null`";
-ICU_MODULE_LIBS="`icu-config --ldflags 2> /dev/null`";
-if test -z "$ICU_MODULE_LIBS"
-then
-    PKG_CHECK_MODULES([ICU_MODULE], [icu >= 0.21])
-fi
+ICU_MODULE_CFLAGS=""
+ICU_MODULE_LIBS=""
+AS_IF([test "$linux_distro" = "ubuntu"],
+[
+  AC_MSG_NOTICE([Detected Ubuntu - using pkg-config for ICU])
+  ICU_MODULE_CFLAGS="`pkg-config --cflags icu-uc icu-i18n`"
+  ICU_MODULE_LIBS="`pkg-config --libs icu-uc icu-i18n`"
+],
+[
+  AC_MSG_NOTICE([Detected non-Ubuntu - using icu-config for ICU])
+  ICU_MODULE_CFLAGS="`icu-config --cppflags 2>/dev/null`"
+  ICU_MODULE_LIBS="`icu-config --ldflags 2>/dev/null`"
+
+  AS_IF([test -z "$ICU_MODULE_LIBS"],
+    [AC_MSG_ERROR([icu-config failed to return valid flags. Please install ICU or set ICU_MODULE_LIBS manually.])])
+])
 
 AC_MSG_CHECKING([use latest ICU])
 AC_ARG_ENABLE([icu_6x],
