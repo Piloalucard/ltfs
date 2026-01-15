@@ -74,17 +74,6 @@ extern "C" {
             }                                                   \
         }while(0)
 
-static inline void arch_strcpy_limited(char *dest, const char *src, int count)
-    {
-        int i;
-        for (i = 0; i < (count) && (src)[i] != '\0'; i++) 
-            (dest)[i] = (src)[i];
-        if (i < (count)) 
-            (dest)[i] = '\0';
-    }
-
-
-
 #ifdef _MSC_VER
 #include <libxml/xmlmemory.h>
 #include <corecrt_io.h>
@@ -203,7 +192,7 @@ static inline void arch_strcpy_limited(char *dest, const char *src, int count)
 
     #define arch_strcpy_auto(dest, src) arch_strcpy(dest, sizeof(dest), src);
 
-    #define arch_strncpy_auto(dest, src, destSize) arch_strncpy(dest, src, destSize, destSize);
+    #define arch_strncpy_auto(dest, src, destSize) arch_strncpy(dest, src, sizeof(dest), destSize);
 
     #define arch_strcat_auto(dest,src) arch_strcat(dest, sizeof(dest), src);
 
