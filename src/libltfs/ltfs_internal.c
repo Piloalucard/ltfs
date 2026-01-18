@@ -216,9 +216,9 @@ int ltfs_read_labels(bool trial, struct ltfs_volume *vol)
 	/* Store label data in the supplied volume */
 	vol->label->creator = label0->creator;
 	label0->creator = NULL;
-	arch_strcpy_auto(vol->label->barcode, label0->barcode);
+	strcpy(vol->label->barcode, label0->barcode);
 	vol->label->barcode[6] = '\0';
-	arch_strcpy_auto(vol->label->vol_uuid, label0->vol_uuid);
+	strcpy(vol->label->vol_uuid, label0->vol_uuid);
 	vol->label->vol_uuid[36] = '\0';
 	vol->label->format_time = label0->format_time;
 	vol->label->blocksize = label0->blocksize;
@@ -592,7 +592,7 @@ int ltfs_seek_index(char partition, tape_block_t *eod_pos, tape_block_t *index_e
 		coh = &vol->ip_coh;
 	else
 		coh = &vol->dp_coh;
-	arch_strcpy_auto(coh->uuid, vol->label->vol_uuid);
+	strcpy(coh->uuid, vol->label->vol_uuid);
 	coh->count = vol->index->generation;
 	coh->set_id = vol->index->selfptr.block;
 
@@ -1083,7 +1083,7 @@ int ltfs_check_medium(bool fix, bool deep, bool recover_extra, bool recover_syml
 		ltfs_index_free(&dp_index);
 		ltfs_index_free(&ip_index);
 		check_err(ltfs_index_alloc(&vol->index, vol), 11225E, out_unlock);
-		arch_strcpy_auto(vol->index->vol_uuid, vol->label->vol_uuid);
+		strcpy(vol->index->vol_uuid, vol->label->vol_uuid);
 		vol->index->mod_time = vol->label->format_time;
 		vol->index->root->creation_time = vol->index->mod_time;
 		vol->index->root->change_time = vol->index->mod_time;
@@ -1238,7 +1238,7 @@ int ltfs_update_cart_coherency(struct ltfs_volume *vol)
 		vol->ip_coh.version = 1; /* From PGA2 */
 		vol->ip_coh.volume_change_ref = current_vcr;
 		if (vol->ip_coh.uuid[0] == '\0')
-			arch_strcpy_auto(vol->ip_coh.uuid, vol->label->vol_uuid);
+			strcpy(vol->ip_coh.uuid, vol->label->vol_uuid);
 		tape_set_cart_coherency(vol->device, ltfs_part_id2num(ltfs_ip_id(vol), vol),
 			&vol->ip_coh);
 	}
@@ -1251,7 +1251,7 @@ int ltfs_update_cart_coherency(struct ltfs_volume *vol)
 		vol->dp_coh.version = 1; /* From PGA2 */
 		vol->dp_coh.volume_change_ref = current_vcr;
 		if (vol->dp_coh.uuid[0] == '\0')
-			arch_strcpy_auto(vol->dp_coh.uuid, vol->label->vol_uuid);
+			strcpy(vol->dp_coh.uuid, vol->label->vol_uuid);
 		tape_set_cart_coherency(vol->device, ltfs_part_id2num(ltfs_dp_id(vol), vol),
 			&vol->dp_coh);
 	}

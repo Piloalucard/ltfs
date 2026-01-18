@@ -2851,9 +2851,9 @@ int ltfs_set_barcode(const char *barcode, struct ltfs_volume *vol)
 				return -LTFS_BARCODE_INVALID;
 			++tmp;
 		}
-		arch_strcpy_auto(vol->label->barcode, barcode);
+		strcpy(vol->label->barcode, barcode);
 	} else
-		arch_strcpy_auto(vol->label->barcode, NO_BARCODE);
+		strcpy(vol->label->barcode, NO_BARCODE);
 	return 0;
 }
 
@@ -3081,7 +3081,7 @@ int ltfs_format_tape(struct ltfs_volume *vol, int density_code, bool destructive
 	}
 
 	/* Set appropriate volume modification time, UUID, and root directory's uid */
-	arch_strcpy_auto(vol->index->vol_uuid, vol->label->vol_uuid);
+	strcpy(vol->index->vol_uuid, vol->label->vol_uuid);
 	vol->index->mod_time = vol->label->format_time;
 	vol->index->root->creation_time = vol->index->mod_time;
 	vol->index->root->change_time = vol->index->mod_time;

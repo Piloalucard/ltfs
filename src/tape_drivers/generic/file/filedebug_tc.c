@@ -80,13 +80,13 @@ char *my_basename(char *path) {
 
 char *my_dirname(char *path) {
 	static char buffer[256];
-	arch_strcpy_auto(buffer, path);
+	strcpy(buffer, path);
 	char *last_slash = strrchr(buffer, '\\');
 	if (last_slash) {
 		*last_slash = '\0';
 	}
 	else {
-		arch_strcpy_auto(buffer, ".");
+		strcpy(buffer, ".");
 	}
 	return buffer;
 }

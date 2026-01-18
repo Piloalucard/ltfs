@@ -400,7 +400,7 @@ int ltfsmsg_internal(bool print_id, int level, char **msg_out, const char *_id, 
 		id[idlen - 2] = '\0';
 	}
 	else {
-		arch_strcpy_auto(id, _id);
+		strcpy(id, _id);
 	}
 
 	id_val = atol(id);

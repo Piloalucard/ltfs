@@ -92,6 +92,7 @@ extern "C" {
 #define O_NONBLOCK 0
 #define INVALID_KEY UINT_MAX
 
+#pragma warning(disable:4996) // disable deprecated warning for MSVC
 
     #define arch_vsprintf   vsprintf_s
 
@@ -158,11 +159,11 @@ extern "C" {
 
     #define arch_getenv(buf ,name) do {  buf = getenv(name); } while (0)
 
-    #define arch_strcpy(dest, unused, src) ({if(unused || !unused) {strcpy(dest, src);}})
+    #define arch_strcpy(dest, unused, src)  ((void)(unused), strcpy(dest, src))
 
-    #define arch_strncpy(dest, src, unused, cnt) strncpy(dest, src, cnt)
+    #define arch_strncpy(dest, src, destSize, cnt) strncpy(dest, src, ((destSize) > (cnt) ? (destSize) : (cnt)))
 
-    #define arch_strcat(dest, unused, src)( {if(unused || !unused){ strcat(dest, src);}})
+    #define arch_strcat(dest, unused, src) ((void)(unused), strcat(dest, src))
 
     #define arch_strtok(str, delim, unused) ((void)(unused), strtok(str, delim))
 
@@ -189,8 +190,6 @@ extern "C" {
 
     /* These needs to be declared at the end to avoid redefinition and to avoid code replication */
     #define arch_vsprintf_auto( buffer,  fmt, ...) arch_vsprintf(buffer,sizeof(buffer),fmt,__VA_ARGS__)
-
-    #define arch_strcpy_auto(dest, src) arch_strcpy(dest, sizeof(dest), src);
 
     #define arch_strncpy_auto(dest, src, destSize) arch_strncpy(dest, src, sizeof(dest), destSize);
 

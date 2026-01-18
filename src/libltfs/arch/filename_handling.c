@@ -77,7 +77,7 @@ void update_platform_safe_name(struct dentry* dentry, bool handle_invalid_char, 
 	int ret;
 
 	dentry->platform_safe_name = NULL;
-	arch_strcpy_auto(source_file_name, dentry->name.name);
+	strcpy(source_file_name, dentry->name.name);
 
 	if (_replace_invalid_chars(source_file_name, &dosdev)) {
 		if (! handle_invalid_char)
