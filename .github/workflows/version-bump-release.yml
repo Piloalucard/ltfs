@@ -1,0 +1,92 @@
+name: Version Bump - Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to base version on (e.g., v.2.4.8.2-10520)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump-version-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: v2.4.8-windows-support
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Process tag and change label to Release
+        id: process_version
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag_name }}"
+          echo "Input tag: $TAG_NAME"
+          
+          # Extract version numbers only (e.g., v.2.4.8.2-10520 -> 2.4.8.2)
+          # Ignore build number after dash
+          VERSION_NUM=$(echo "$TAG_NAME" | sed -E 's/^v\.?([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          echo "Extracted version: $VERSION_NUM"
+          
+          # DO NOT increment - just change label to Release
+          # This keeps the same version number, only changes (Prelim) to (Release)
+          FINAL_VERSION="$VERSION_NUM (Release)"
+          echo "Final version string: $FINAL_VERSION"
+          
+          # Store in output
+          echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
+          echo "version_num=$VERSION_NUM" >> $GITHUB_OUTPUT
+      
+      - name: Update configure.ac
+        id: update_file
+        run: |
+          VERSION="${{ steps.process_version.outputs.version }}"
+          
+          # Update line 39 with the new version
+          sed -i "39s/\[LTFS\], \[[^]]*\]/[LTFS], [$VERSION]/" configure.ac
+          
+          echo "File updated successfully"
+          echo "Updated line 39:"
+          sed -n '39p' configure.ac
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump version to ${{ steps.process_version.outputs.version }}"
+          branch: version-bump-release-${{ steps.process_version.outputs.version_num }}
+          base: v2.4.8-windows-support
+          title: "Version Bump: ${{ steps.process_version.outputs.version }}"
+          body: |
+            ## Version Bump - Release
+            
+            This PR updates the version in configure.ac to prepare for a new release.
+            
+            - **Base Tag**: ${{ github.event.inputs.tag_name }}
+            - **Version**: ${{ steps.process_version.outputs.version }}
+            
+            ### Changes
+            - Updated configure.ac line 39 with Release label
+            - Version number unchanged, only label changed to Release
+            
+            Please review and merge this PR before creating the release tag.
+          labels: release, version-bump
+      
+      - name: Summary
+        run: |
+          echo "## Version Bump Summary - Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Input Tag**: ${{ github.event.inputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.process_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Branch**: v2.4.8-windows-support" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Pull Request Created** - Please review and merge before creating the release tag." >> $GITHUB_STEP_SUMMARY
+
+# Made with Bob
