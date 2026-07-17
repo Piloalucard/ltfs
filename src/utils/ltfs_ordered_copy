@@ -4,7 +4,7 @@
 #  OO_Copyright_BEGIN
 #
 #
-#  Copyright 2010, 2021 IBM Corp. All rights reserved.
+#  Copyright 2010, 2026 IBM Corp. All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
 #   modification, are permitted provided that the following conditions
@@ -40,6 +40,15 @@ import argparse
 import xattr
 import shutil
 import threading
+
+# Compatibility shim: Ubuntu's xattr API differs from the RHEL version,
+# alias the Ubuntu method names to the expected interface
+if not hasattr(xattr, 'get'):
+    xattr.get  = xattr.getxattr
+if not hasattr(xattr, 'set'):
+    xattr.set  = xattr.setxattr
+if not hasattr(xattr, 'list'):
+    xattr.list = xattr.listxattr
 
 from logging import getLogger, basicConfig, NOTSET, CRITICAL, ERROR, WARNING, INFO, DEBUG
 from collections import deque
