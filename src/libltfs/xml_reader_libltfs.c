@@ -1301,7 +1301,6 @@ static int _xml_parse_dir_contents(xmlTextReaderPtr reader, struct dentry *dir,
  */
 static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 							  struct ltfs_index *idx, struct ltfs_volume *vol,
-							  struct name_list *dirname, int depth)
 {
 	unsigned long long value_int;
 	struct dentry *dir;
@@ -1720,7 +1719,6 @@ static int _xml_symlinkinfo_from_file(const char *filename, struct dentry *d)
 {
 	declare_parser_vars_symlink("symlink");
 	xmlTextReaderPtr reader;
-	xmlDocPtr doc;
 	int ret = 0;
 
 	CHECK_ARG_NULL(filename, -LTFS_NULL_ARG);
@@ -1731,11 +1729,6 @@ static int _xml_symlinkinfo_from_file(const char *filename, struct dentry *d)
 		ltfsmsg(LTFS_ERR, 17011E, filename);
 		return -1;
 	}
-
-	/* Workaround for old libxml2 version on OS X 10.5: the method used to preserve
-	 * unknown tags modifies the behavior of xmlFreeTextReader so that an additional
-	 * xmlDocFree call is required to free all memory. */
-	doc = xmlTextReaderCurrentDoc(reader);
 
 	while (true) {
 		get_next_tag();
@@ -1750,7 +1743,6 @@ static int _xml_symlinkinfo_from_file(const char *filename, struct dentry *d)
 	}
 
 	if (doc)
-		xmlFreeDoc(doc);
 	xmlFreeTextReader(reader);
 
 	return ret;
@@ -1768,7 +1760,6 @@ static int _xml_extentlist_from_file(const char *filename, struct dentry *d)
 {
 	declare_extent_parser_vars("extentinfo");
 	xmlTextReaderPtr reader;
-	xmlDocPtr doc;
 	int ret = 0;
 
 	CHECK_ARG_NULL(filename, -LTFS_NULL_ARG);
@@ -1779,11 +1770,6 @@ static int _xml_extentlist_from_file(const char *filename, struct dentry *d)
 		ltfsmsg(LTFS_ERR, 17011E, filename);
 		return -1;
 	}
-
-	/* Workaround for old libxml2 version on OS X 10.5: the method used to preserve
-	 * unknown tags modifies the behavior of xmlFreeTextReader so that an additional
-	 * xmlDocFree call is required to free all memory. */
-	doc = xmlTextReaderCurrentDoc(reader);
 
 	while (true) { /* BEAM: loop doesn't iterate - Because get_next_tag() macro uses "break", at most once loop is needed here. */
 		get_next_tag();
@@ -1797,8 +1783,6 @@ static int _xml_extentlist_from_file(const char *filename, struct dentry *d)
 		break;
 	}
 
-	if (doc)
-		xmlFreeDoc(doc);
 	xmlFreeTextReader(reader);
 
 	return ret;
@@ -1867,7 +1851,6 @@ int xml_schema_from_file(const char *filename, struct ltfs_index *idx, struct lt
 {
 	int ret;
 	xmlTextReaderPtr reader;
-	xmlDocPtr doc;
 
 	CHECK_ARG_NULL(filename, -LTFS_NULL_ARG);
 	CHECK_ARG_NULL(idx, -LTFS_NULL_ARG);
@@ -1878,15 +1861,9 @@ int xml_schema_from_file(const char *filename, struct ltfs_index *idx, struct lt
 		return -LTFS_FILE_ERR;
 	}
 
-	/* Workaround for old libxml2 version on OS X 10.5: the method used to preserve
-	 * unknown tags modifies the behavior of xmlFreeTextReader so that an additional
-	 * xmlDocFree call is required to free all memory. */
-	doc = xmlTextReaderCurrentDoc(reader);
 	ret = _xml_parse_schema(reader, idx, vol);
 	if (ret < 0)
 		ltfsmsg(LTFS_ERR, 17012E, filename, ret);
-	if (doc)
-		xmlFreeDoc(doc);
 	xmlFreeTextReader(reader);
 
 #ifdef DEBUG
@@ -1916,7 +1893,6 @@ int xml_schema_from_tape(uint64_t eod_pos, struct ltfs_volume *vol)
 	struct xml_input_tape *ctx;
 	xmlParserInputBufferPtr read_buf;
 	xmlTextReaderPtr reader;
-	xmlDocPtr doc;
 
 	CHECK_ARG_NULL(vol, -LTFS_NULL_ARG);
 
@@ -1982,10 +1958,6 @@ int xml_schema_from_tape(uint64_t eod_pos, struct ltfs_volume *vol)
 	}
 #endif
 
-	/* Workaround for old libxml2 version on OS X 10.5. See comment in xml_schema_from_file()
-	 * for details. */
-	doc = xmlTextReaderCurrentDoc(reader);
-
 	/* Generate the Index. */
 	ret = _xml_parse_schema(reader, vol->index, vol);
 	if (ctx->err_code < 0) {
@@ -2007,8 +1979,6 @@ int xml_schema_from_tape(uint64_t eod_pos, struct ltfs_volume *vol)
 		}
 	}
 
-	if (doc)
-		xmlFreeDoc(doc);
 	xmlFreeTextReader(reader);
 	xmlFreeParserInputBuffer(read_buf);
 
