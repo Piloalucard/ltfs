@@ -730,7 +730,7 @@ void _fs_dispose_dentry_contents(struct dentry *dentry, bool unlock, bool gc)
 			free(xattr_entry);
 		}
 	}
-	if (dentry->parent) {
+	if (dentry->parent && dentry->platform_safe_name) {
 		namelist = fs_find_key_from_hash_table(dentry->parent->child_list, dentry->platform_safe_name, &rc);
 		if (rc != 0) {
             ltfsmsg(LTFS_ERR, 11320E, "_fs_dispose_dentry_contents", rc);
@@ -740,6 +740,8 @@ void _fs_dispose_dentry_contents(struct dentry *dentry, bool unlock, bool gc)
 			free(namelist->name);
 			free(namelist);
 		}
+		dentry->parent = NULL;
+	} else if (dentry->parent) {
 		dentry->parent = NULL;
 	}
 	if (dentry->name.name) {
