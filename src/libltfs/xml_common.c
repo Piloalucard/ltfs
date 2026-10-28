@@ -47,14 +47,29 @@
 *************************************************************************************
 */
 
+#include <stdlib.h>
 #include "xml.h"
 
 void xml_init()
 {
+#if (!defined(_MSC_VER) && !defined(mingw_PLATFORM) && !defined(_WIN32))
+	/*
+	 * Route libxml2's internal allocator through glibc malloc/free before any
+	 * other libxml2 call.  This ensures libxml2 memory is visible to mallopt()
+	 * tuning (e.g. M_ARENA_MAX) and to heap profilers.  Must be called once,
+	 * before any thread touches libxml2.
+	 */
+	xmlMemSetup(free, malloc, realloc, strdup);
+#endif
 	LIBXML_TEST_VERSION;
 }
 
 void xml_finish()
 {
-	xmlCleanupParser();
+	/*
+	 * xmlCleanupParser() frees global libxml2 state (encoding tables, etc.)
+	 * and is NOT safe to call while any other thread may still be using
+	 * libxml2. Since ltfs_finish() runs immediately before process termination,
+	 * simply omit the call. Memory will be reclaimed by the OS.
+	 */
 }

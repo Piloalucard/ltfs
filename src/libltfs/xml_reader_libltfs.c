@@ -98,10 +98,6 @@ static int decode_entry_name(char **new_name, const char *name)
 	/* Always, length must be shorter than original but allocate null termination space */
 	len = strlen(name);
 	tmp_name = malloc((len * sizeof(UChar)) + 1);
-	if (! tmp_name) {
-		ltfsmsg(LTFS_ERR, 10001E, "decode_entry_name: tmp_name");
-		return -LTFS_NO_MEMORY;
-	}
 	buf_decode[2] = '\0';
 
 	while (i < len) {
@@ -579,15 +575,8 @@ static int _xml_parse_ip_criteria(xmlTextReaderPtr reader, struct ltfs_index *id
 
 			++num_patterns;
 			/* quite inefficient, but the number of patterns should be small. */
-			{
-				struct ltfs_name *new_patterns = realloc(idx->original_criteria.glob_patterns,
-														 (num_patterns + 1) * sizeof(struct ltfs_name));
-				if (! new_patterns) {
-					ltfsmsg(LTFS_ERR, 10001E, "_xml_parse_ip_criteria: glob_patterns");
-					return -LTFS_NO_MEMORY;
-				}
-				idx->original_criteria.glob_patterns = new_patterns;
-			}
+			idx->original_criteria.glob_patterns = realloc(idx->original_criteria.glob_patterns,
+														   (num_patterns + 1) * sizeof(struct ltfs_name));
 
 			if (_xml_parse_nametype(reader,
 									&idx->original_criteria.glob_patterns[num_patterns - 1],
@@ -874,10 +863,10 @@ static int _xml_parse_one_xattr(xmlTextReaderPtr reader, struct dentry *d)
 	if (xattr) {
 		TAILQ_INSERT_TAIL(&d->xattrlist, xattr, list);
 
-		if (xattr->value && !strcmp(xattr->key.name, "ltfs.vendor.IBM.immutable") && !strcmp(xattr->value, "1") ) {
+		if (!strcmp(xattr->key.name, "ltfs.vendor.IBM.immutable") && !strcmp(xattr->value, "1") ) {
 			d->is_immutable = true;
 		}
-		if (xattr->value && !strcmp(xattr->key.name, "ltfs.vendor.IBM.appendonly") && !strcmp(xattr->value, "1") ) {
+		if (!strcmp(xattr->key.name, "ltfs.vendor.IBM.appendonly") && !strcmp(xattr->value, "1") ) {
 			d->is_appendonly = true;
 		}
 	}
@@ -1001,7 +990,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 
 			ret = _xml_parse_nametype(reader, &file->name, false);
 			if (ret < 0) {
-				free(file);
+				fs_release_dentry(file);
 				return ret;
 			}
 
@@ -1014,6 +1003,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			get_tag_text();
 			if (xml_parse_ull(&value_int, value) < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "length", file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_SIZE;
 			}
 			file->size = value_int;
@@ -1024,6 +1014,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			get_tag_text();
 			if (xml_parse_bool(&file->readonly, value) < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "readonly", file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_RO_F;
 			}
 			check_tag_end("readonly");
@@ -1034,6 +1025,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			ret = xml_parse_time(true, value, &file->modify_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "modifytime", file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_MTIME_F;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "modifytime", file->name.name, (unsigned long long)file->uid, value);
@@ -1045,6 +1037,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			ret = xml_parse_time(true, value, &file->creation_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "creationtime", file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_CRTIME_F;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "creationtime", file->name.name, (unsigned long long)file->uid, value);
@@ -1057,6 +1050,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			ret = xml_parse_time(true, value, &file->access_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "accesstime", file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_ATIME_F;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "accesstime", file->name.name, (unsigned long long)file->uid, value);
@@ -1068,6 +1062,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			ret = xml_parse_time(true, value, &file->change_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "changetime", file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_CTIME_F;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "changetime", file->name.name, (unsigned long long)file->uid, value);
@@ -1081,6 +1076,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 				ret = _xml_parse_xattrs(reader, file);
 				if(ret < 0) {
 					ltfsmsg(LTFS_ERR, 17270E, "extendedattributes", file->name.name);
+					fs_release_dentry(file);
 					return ret;
 				}
 			}
@@ -1092,17 +1088,18 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 				ret = _xml_parse_extents(reader, idx->version, file);
 				if(ret < 0) {
 					ltfsmsg(LTFS_ERR, 17270E, "extentinfo", file->name.name);
+					fs_release_dentry(file);
 					return ret;
 				}
 			} else extent_flag = true;
 
-        } else if (!strcmp(name, "symlink")) {
+		} else if (!strcmp(name, "symlink")) {
 			check_optional_tag(2);
 
 			ret = _xml_parse_nametype(reader, &file->target, true);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, "symlink", file->name.name);
-				free(file);
+				fs_release_dentry(file);
 				return ret;
 			}
 
@@ -1127,6 +1124,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			get_tag_text();
 			if (xml_parse_ull(&value_int, value) < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, UID_TAGNAME, file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_UID;
 			}
 			file->uid = value_int;
@@ -1143,6 +1141,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 			ret = xml_parse_time(true, value, &file->backup_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17270E, BACKUPTIME_TAGNAME, file->name.name);
+				fs_release_dentry(file);
 				return -LTFS_XML_WRONG_BTIME_F;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "backuptime", file->name.name, (unsigned long long)file->uid, value);
@@ -1177,6 +1176,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 		xt_last = TAILQ_LAST(&file->extentlist, extent_struct);
 		if (xt_last->fileoffset + xt_last->bytecount > file->size) {
 			ltfsmsg(LTFS_ERR, 17026E);
+			fs_release_dentry(file);
 			return -LTFS_XML_EXT_TOO_LONG;
 		}
 	}
@@ -1184,6 +1184,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 	/* Validate UID: must be nonzero (UID 0 is reserved for the root directory) */
 	if (file->uid == 0) {
 		ltfsmsg(LTFS_ERR, 17101E, file->name.name);
+		fs_release_dentry(file);
 		return -LTFS_XML_WRONG_UID;
 	}
 
@@ -1192,6 +1193,7 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
 		ret = _xml_save_symlink_conflict(idx, file);
 		if (ret < 0) {
 			ltfsmsg(LTFS_ERR, 17271E, file->name.name);
+			fs_release_dentry(file);
 			return ret;
 		}
 	}
@@ -1203,16 +1205,11 @@ static int _xml_parse_file(xmlTextReaderPtr reader, struct ltfs_index *idx, stru
  * Parse a dir into the given directory.
  */
 
-/* Stack-safety bound for the recursive directory parser (XML_PARSE_HUGE
- * disables libxml2's own nesting limit); not an LTFS format limit. */
-#define XML_MAX_DIRTREE_DEPTH 1024
-
 static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 							  struct ltfs_index *idx, struct ltfs_volume *vol,
-							  struct name_list *dirname, int depth); /* Forward reference */
+							  struct name_list *dirname); /* Forward reference */
 
-static int _xml_parse_dir_contents(xmlTextReaderPtr reader, struct dentry *dir,
-								   struct ltfs_index *idx, int depth)
+static int _xml_parse_dir_contents(xmlTextReaderPtr reader, struct dentry *dir, struct ltfs_index *idx)
 {
 	struct name_list *list = NULL, *entry_name = NULL;
 	CHECK_ARG_NULL(dir, -LTFS_NULL_ARG);
@@ -1244,7 +1241,7 @@ static int _xml_parse_dir_contents(xmlTextReaderPtr reader, struct dentry *dir,
 				ltfsmsg(LTFS_ERR, 10001E, "_xml_parse_dir_contents: dir");
 				return -LTFS_NO_MEMORY;
 			}
-			ret = _xml_parse_dirtree(reader, dir, idx, dir->vol, entry_name, depth + 1);
+			ret = _xml_parse_dirtree(reader, dir, idx, dir->vol, entry_name);
 			if (ret < 0) {
 				free(entry_name);
 				return ret;
@@ -1301,17 +1298,13 @@ static int _xml_parse_dir_contents(xmlTextReaderPtr reader, struct dentry *dir,
  */
 static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 							  struct ltfs_index *idx, struct ltfs_volume *vol,
+							  struct name_list *dirname)
 {
 	unsigned long long value_int;
 	struct dentry *dir;
 
 	declare_parser_vars("directory");
 	declare_tracking_arrays(9, 1);
-
-	if (depth > XML_MAX_DIRTREE_DEPTH) {
-		ltfsmsg(LTFS_ERR, 17295E, XML_MAX_DIRTREE_DEPTH);
-		return -LTFS_XML_DEEP_NESTING;
-	}
 
 	if (! parent && idx->root) {
 		dir = idx->root;
@@ -1339,7 +1332,7 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 				ret = _xml_parse_nametype(reader, &dir->name, false);
 				if (ret < 0) {
 					ltfsmsg(LTFS_ERR, 17272E, "name", parent->name.name);
-					free(dir);
+					fs_release_dentry(dir);
 					return ret;
 				}
 				dirname->name = dir->name.name;
@@ -1371,6 +1364,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			get_tag_text();
 			if (xml_parse_bool(&dir->readonly, value) < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, "readonly", dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_RO_DIR;
 			}
 			check_tag_end("readonly");
@@ -1381,6 +1376,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			ret = xml_parse_time(true, value, &dir->modify_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, "modifytime", dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_MTIME_DIR;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "updatetime", dir->name.name, (unsigned long long)dir->uid, value);
@@ -1393,6 +1390,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			ret = xml_parse_time(true, value, &dir->creation_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, "creationtime", dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_CRTIME_DIR;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "creationtime", dir->name.name, (unsigned long long)dir->uid, value);
@@ -1405,6 +1404,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			ret = xml_parse_time(true, value, &dir->access_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, "accesstime", dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_CTIME_DIR;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "accesstime", dir->name.name, (unsigned long long)dir->uid, value);
@@ -1417,6 +1418,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			ret = xml_parse_time(true, value, &dir->change_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, "changetime", dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_CTIME_DIR;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "changetime", dir->name.name, (unsigned long long)dir->uid, value);
@@ -1427,9 +1430,12 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			check_required_tag(6);
 			check_empty();
 			if (empty == 0) {
-				ret = _xml_parse_dir_contents(reader, dir, idx, depth);
-				if (ret < 0)
+				ret = _xml_parse_dir_contents(reader, dir, idx);
+				if (ret < 0) {
+					if (parent)
+						fs_release_dentry(dir);
 					return ret;
+				}
 			}
 
 		} else if (!strcmp(name, "extendedattributes")) {
@@ -1439,6 +1445,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 				ret = _xml_parse_xattrs(reader, dir);
 				if(ret < 0) {
 					ltfsmsg(LTFS_ERR, 17272E, "extendedattributes", dir->name.name);
+					if (parent)
+						fs_release_dentry(dir);
 					return ret;
 				}
 			}
@@ -1448,6 +1456,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			get_tag_text();
 			if (xml_parse_ull(&value_int, value) < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, UID_TAGNAME, dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_UID;
 			}
 			dir->uid = value_int;
@@ -1466,6 +1476,8 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 			ret = xml_parse_time(true, value, &dir->backup_time);
 			if (ret < 0) {
 				ltfsmsg(LTFS_ERR, 17272E, BACKUPTIME_TAGNAME, dir->name.name);
+				if (parent)
+					fs_release_dentry(dir);
 				return -LTFS_XML_WRONG_BTIME_DIR;
 			} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 				ltfsmsg(LTFS_WARN, 17220W, "backuptime", dir->name.name, (unsigned long long)dir->uid, value);
@@ -1502,12 +1514,15 @@ static int _xml_parse_dirtree(xmlTextReaderPtr reader, struct dentry *parent,
 	/* TODO: would be nice to verify that there are no UID conflicts */
 	if (parent && dir->uid == 1) {
 		ltfsmsg(LTFS_ERR, 17101E, dir->name.name);
+		fs_release_dentry(dir);
 		return -LTFS_XML_INVALID_UID;
 	} else if (! parent && dir->uid != 1) {
 		ltfsmsg(LTFS_ERR, 17100E);
 		return -LTFS_XML_INVALID_UID;
 	} else if (dir->uid == 0) {
 		ltfsmsg(LTFS_ERR, 17106E);
+		if (parent)
+			fs_release_dentry(dir);
 		return -LTFS_XML_INVALID_UID;
 	}
 
@@ -1618,7 +1633,7 @@ static int _xml_parse_schema(xmlTextReaderPtr reader, struct ltfs_index *idx, st
 		} else if (! strcmp(name, "directory")) {
 			check_required_tag(6);
 			assert_not_empty();
-			ret = _xml_parse_dirtree(reader, NULL, idx, vol, NULL, 0);
+			ret = _xml_parse_dirtree(reader, NULL, idx, vol, NULL);
 			if (ret < 0)
 				return ret;
 
@@ -1742,7 +1757,6 @@ static int _xml_symlinkinfo_from_file(const char *filename, struct dentry *d)
 		break;
 	}
 
-	if (doc)
 	xmlFreeTextReader(reader);
 
 	return ret;

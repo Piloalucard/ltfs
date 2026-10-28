@@ -604,13 +604,21 @@ static int _xml_write_schema(xmlTextWriterPtr writer, const char *creator,
  * @param label data structure containing format parameters
  * @return buffer containing the label, which the caller should free using xmlBufferFree
  */
+#define xml_mktag_goto(val, label) \
+	do { \
+		if ((val) < 0) { \
+			ltfsmsg(LTFS_ERR, 17042E, __FUNCTION__); \
+			goto label; \
+		} \
+	} while (0)
+
 xmlBufferPtr xml_make_label(const char *creator, tape_partition_t partition,
 							const struct ltfs_label *label)
 {
 	int ret;
-	char *fmt_time;
+	char *fmt_time = NULL;
 	xmlBufferPtr buf = NULL;
-	xmlTextWriterPtr writer;
+	xmlTextWriterPtr writer = NULL;
 
 	CHECK_ARG_NULL(creator, NULL);
 	CHECK_ARG_NULL(label, NULL);
@@ -624,60 +632,72 @@ xmlBufferPtr xml_make_label(const char *creator, tape_partition_t partition,
 	writer = xmlNewTextWriterMemory(buf, 0);
 	if (!writer) {
 		ltfsmsg(LTFS_ERR, 17043E);
+		xmlBufferFree(buf);
 		return NULL;
 	}
 
 	ret = xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL);
 	if (ret < 0) {
 		ltfsmsg(LTFS_ERR, 17044E, ret);
-		return NULL;
+		goto out_err;
 	}
 
 	xmlTextWriterSetIndent(writer, 1);
 	xmlTextWriterSetIndentString(writer, BAD_CAST "    ");
 
 	/* write tags */
-	xml_mktag(xmlTextWriterStartElement(writer, BAD_CAST "ltfslabel"), NULL);
-	xml_mktag(xmlTextWriterWriteAttribute(writer, BAD_CAST "version",
-		BAD_CAST LTFS_LABEL_VERSION_STR), NULL);
-	xml_mktag(xmlTextWriterWriteElement(writer, BAD_CAST "creator", BAD_CAST creator), NULL);
+	xml_mktag_goto(xmlTextWriterStartElement(writer, BAD_CAST "ltfslabel"), out_err);
+	xml_mktag_goto(xmlTextWriterWriteAttribute(writer, BAD_CAST "version",
+		BAD_CAST LTFS_LABEL_VERSION_STR), out_err);
+	xml_mktag_goto(xmlTextWriterWriteElement(writer, BAD_CAST "creator", BAD_CAST creator), out_err);
 
 	ret = xml_format_time(label->format_time, &fmt_time);
 	if (!fmt_time) {
 		ltfsmsg(LTFS_ERR, 17045E);
-		return NULL;
+		goto out_err;
 	} else if (ret == LTFS_TIME_OUT_OF_RANGE)
 		ltfsmsg(LTFS_WARN, 17223W, "formattime", (unsigned long long)label->format_time.tv_sec);
 
-	xml_mktag(xmlTextWriterWriteElement(writer, BAD_CAST "formattime", BAD_CAST fmt_time), NULL);
+	xml_mktag_goto(xmlTextWriterWriteElement(writer, BAD_CAST "formattime", BAD_CAST fmt_time), out_err);
 	free(fmt_time);
-	xml_mktag(xmlTextWriterWriteElement(
-		writer, BAD_CAST "volumeuuid", BAD_CAST label->vol_uuid), NULL);
-    xml_mktag(xmlTextWriterStartElement(writer, BAD_CAST "location"), NULL);
-	xml_mktag(xmlTextWriterWriteFormatElement(
-		writer, BAD_CAST "partition", "%c", label->part_num2id[partition]), NULL);
-	xml_mktag(xmlTextWriterEndElement(writer), NULL);
-	xml_mktag(xmlTextWriterStartElement(writer, BAD_CAST "partitions"), NULL);
-	xml_mktag(xmlTextWriterWriteFormatElement(
-		writer, BAD_CAST "index", "%c", label->partid_ip), NULL);
-	xml_mktag(xmlTextWriterWriteFormatElement(
-		writer, BAD_CAST "data", "%c", label->partid_dp), NULL);
-	xml_mktag(xmlTextWriterEndElement(writer), NULL);
-	xml_mktag(xmlTextWriterWriteFormatElement(
-		writer, BAD_CAST "blocksize", "%ld", label->blocksize), NULL);
-	xml_mktag(xmlTextWriterWriteElement(
+	fmt_time = NULL;
+
+	xml_mktag_goto(xmlTextWriterWriteElement(
+		writer, BAD_CAST "volumeuuid", BAD_CAST label->vol_uuid), out_err);
+	xml_mktag_goto(xmlTextWriterStartElement(writer, BAD_CAST "location"), out_err);
+	xml_mktag_goto(xmlTextWriterWriteFormatElement(
+		writer, BAD_CAST "partition", "%c", label->part_num2id[partition]), out_err);
+	xml_mktag_goto(xmlTextWriterEndElement(writer), out_err);
+	xml_mktag_goto(xmlTextWriterStartElement(writer, BAD_CAST "partitions"), out_err);
+	xml_mktag_goto(xmlTextWriterWriteFormatElement(
+		writer, BAD_CAST "index", "%c", label->partid_ip), out_err);
+	xml_mktag_goto(xmlTextWriterWriteFormatElement(
+		writer, BAD_CAST "data", "%c", label->partid_dp), out_err);
+	xml_mktag_goto(xmlTextWriterEndElement(writer), out_err);
+	xml_mktag_goto(xmlTextWriterWriteFormatElement(
+		writer, BAD_CAST "blocksize", "%ld", label->blocksize), out_err);
+	xml_mktag_goto(xmlTextWriterWriteElement(
 		writer, BAD_CAST "compression", BAD_CAST (label->enable_compression ? "true" : "false")),
-		NULL);
-	xml_mktag(xmlTextWriterEndElement(writer), NULL);
+		out_err);
+	xml_mktag_goto(xmlTextWriterEndElement(writer), out_err);
 
 	ret = xmlTextWriterEndDocument(writer);
 	if (ret < 0) {
 		ltfsmsg(LTFS_ERR, 17046E, ret);
-		return NULL;
+		goto out_err;
 	}
 
 	xmlFreeTextWriter(writer);
 	return buf;
+
+out_err:
+	if (fmt_time)
+		free(fmt_time);
+	if (writer)
+		xmlFreeTextWriter(writer);
+	if (buf)
+		xmlBufferFree(buf);
+	return NULL;
 }
 
 /**
@@ -702,13 +722,15 @@ xmlBufferPtr xml_make_schema(const char *creator, const struct ltfs_index *idx)
 	writer = xmlNewTextWriterMemory(buf, 0);
 	if (!writer) {
 		ltfsmsg(LTFS_ERR, 17049E);
+		xmlBufferFree(buf);
 		return NULL;
 	}
 
 	if (_xml_write_schema(writer, creator, idx) < 0) {
 		ltfsmsg(LTFS_ERR, 17050E);
+		xmlFreeTextWriter(writer);
 		xmlBufferFree(buf);
-		buf = NULL;
+		return NULL;
 	}
 	xmlFreeTextWriter(writer);
 	return buf;
@@ -768,32 +790,52 @@ static int _commit_offset_caches(const char* path, const struct ltfs_index *idx)
 
 /**
  * Generate an XML schema file based on the priv->root directory tree.
+ *
+ * The schema is written atomically: first to a temporary file
+ * "<filename>.new", then fsync'd and renamed over the target.  This
+ * prevents a crash mid-write from leaving a truncated/corrupt schema on
+ * disk (the failure mode that put tapes A00377-A00384 into
+ * require_validate state).
+ *
  * @param filename output XML file
- * @param priv ltfs private data
+ * @param creator  creator string
+ * @param reason   optional reason suffix appended to creator (may be NULL)
+ * @param idx      LTFS index to serialise
  * @return 0 on success or a negative value on error.
  */
 int xml_schema_to_file(const char *filename, const char *creator,
 					   const char *reason, const struct ltfs_index *idx)
 {
 	xmlTextWriterPtr writer;
-	int ret;
+	int ret, fd;
 	char *alt_creator = NULL;
+	char *tmp_filename = NULL;
 
 	CHECK_ARG_NULL(creator, -LTFS_NULL_ARG);
 	CHECK_ARG_NULL(idx, -LTFS_NULL_ARG);
 	CHECK_ARG_NULL(filename, -LTFS_NULL_ARG);
 
-	writer = xmlNewTextWriterFilename(filename, 0);
+	/* Build the temporary filename alongside the target. */
+	ret = asprintf(&tmp_filename, "%s.new", filename);
+	if (ret < 0) {
+		ltfsmsg(LTFS_ERR, 10001E, "xml_schema_to_file: tmp_filename");
+		return -LTFS_NO_MEMORY;
+	}
+
+	writer = xmlNewTextWriterFilename(tmp_filename, 0);
 	if (! writer) {
-		ltfsmsg(LTFS_ERR, 17051E, filename);
+		ltfsmsg(LTFS_ERR, 17051E, tmp_filename);
+		free(tmp_filename);
 		return -1;
 	}
 
 	if (reason) {
-		ret = asprintf(&alt_creator, "%s - %s", creator , reason);
+		ret = asprintf(&alt_creator, "%s - %s", creator, reason);
 		if (ret < 0) {
 			ltfsmsg(LTFS_ERR, 10001E, "xml_schema_to_file: alt_creator");
 			xmlFreeTextWriter(writer);
+			arch_unlink(tmp_filename);
+			free(tmp_filename);
 			return -LTFS_NO_MEMORY;
 		}
 	} else {
@@ -801,18 +843,55 @@ int xml_schema_to_file(const char *filename, const char *creator,
 		if (!alt_creator) {
 			ltfsmsg(LTFS_ERR, 10001E, "xml_schema_to_file: alt_creator string");
 			xmlFreeTextWriter(writer);
+			arch_unlink(tmp_filename);
+			free(tmp_filename);
 			return -LTFS_NO_MEMORY;
 		}
 	}
-	ret = _xml_write_schema(writer, alt_creator, idx);
-	if (ret < 0)
-		ltfsmsg(LTFS_ERR, 17052E, ret, filename);
-	else
-		_commit_offset_caches(filename, idx);
 
+	ret = _xml_write_schema(writer, alt_creator, idx);
 	xmlFreeTextWriter(writer);
 	free(alt_creator);
-	return ret;
+
+	if (ret < 0) {
+		ltfsmsg(LTFS_ERR, 17052E, ret, filename);
+		arch_unlink(tmp_filename);
+		free(tmp_filename);
+		return ret;
+	}
+
+	/* fsync the temp file before rename so the data survives a crash
+	 * between rename and the next fsync of the parent directory. */
+	arch_open(&fd, tmp_filename, O_RDWR | O_BINARY, SHARE_FLAG_DENYRW, PERMISSION_READWRITE);
+	if (fd >= 0) {
+		if (fsync(fd) < 0) {
+			ltfsmsg(LTFS_ERR, 17052E, -errno, filename);
+			arch_close(fd);
+			arch_unlink(tmp_filename);
+			free(tmp_filename);
+			return -LTFS_FILE_ERR;
+		}
+		arch_close(fd);
+	} else {
+		ltfsmsg(LTFS_ERR, 17052E, -errno, filename);
+		arch_unlink(tmp_filename);
+		free(tmp_filename);
+		return -LTFS_FILE_ERR;
+	}
+
+	/* Atomic promotion: rename(2) is atomic on POSIX filesystems.
+	 * On platforms where rename fails if the target exists, unlink first. */
+	arch_unlink(filename);
+	if (rename(tmp_filename, filename) != 0) {
+		ltfsmsg(LTFS_ERR, 17052E, -errno, filename);
+		arch_unlink(tmp_filename);
+		free(tmp_filename);
+		return -LTFS_FILE_ERR;
+	}
+
+	free(tmp_filename);
+	_commit_offset_caches(filename, idx);
+	return 0;
 }
 
 /**
