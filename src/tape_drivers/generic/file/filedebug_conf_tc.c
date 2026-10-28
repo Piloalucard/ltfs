@@ -312,8 +312,7 @@ int filedebug_conf_tc_read_xml(char *filename, struct filedebug_conf_tc *conf)
 {
 	int ret;
 	xmlTextReaderPtr reader;
-	xmlDocPtr doc;
-
+	
 	reader = xmlReaderForFile(filename, NULL, XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
 	if (! reader) {
 		ltfsmsg(LTFS_ERR, 30157E);
